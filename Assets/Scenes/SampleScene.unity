@@ -1279,9 +1279,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7fab308ce280c7740b00f5ed67628407, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  Walls: {fileID: 2136395704984708893, guid: 4efdda44ffa629842956612e49c2b318, type: 3}
-  snake: {fileID: 6879724630431878869, guid: 2e9dea3b91ebcef4c96bae1de1a88981, type: 3}
-  frutita: {fileID: 5510142724418767479, guid: 3206ad2f101222e4e9b5a557cc12134e, type: 3}
+  wallGraphic: {fileID: 2136395704984708893, guid: 4efdda44ffa629842956612e49c2b318,
+    type: 3}
+  snakeGraphic: {fileID: 6879724630431878869, guid: 2e9dea3b91ebcef4c96bae1de1a88981,
+    type: 3}
+  fruitGraphic: {fileID: 5510142724418767479, guid: 3206ad2f101222e4e9b5a557cc12134e,
+    type: 3}
   panelPerdiste: {fileID: 999045093}
   camera: {fileID: 963194225}
   speed: 0.2

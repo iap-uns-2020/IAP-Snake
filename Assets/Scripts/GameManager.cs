@@ -5,37 +5,30 @@ using UnityEngine.SceneManagement;
 
 public class GameManager : MonoBehaviour
 {
-    private int[,] matrixWalls,matrixSnake,matrixFrutitas;
-    public GameObject Walls, snake, frutita;
-    private List<Vector3Int> snakePositions; //lista de posiciones
+
+    public GameObject wallGraphic, snakeGraphic, fruitGraphic;
     private List<GameObject> snakeGraphicParts; //lista de partes de snake (cubitos)
-    private int currentDirection  = 0; //dirección de movimiento
     public GameObject panelPerdiste;
     private GameObject laFrutita;
     private bool gotFrutita; //indica que agarró una frutita para agrandar la cola
-    private Vector3Int ultimaPosicion;
     public GameObject camera;
-    public float speed = 0.2f;
     private bool endOfGame = false;
+    private Vector3Int ultimaPosicion;
 
-    private const int boardRows = 200;
-    private const int boardCols = 10;
-    private const int minNumberOfWalls = 1;
-    private const int maxNumberOfWalls = 200;
-
-    private const int RIGHT = 1;
-    private const int UP = 2;
-    private const int LEFT = 3;
-    private const int DOWN = 4;
 
     public GameObject panelAndroid;
 
-    private SnakeState snakeState;
+
+
+    private WorldMap worldMap;
+    private Snake snake;
+    private Player player;
 
     // Start is called before the first frame update
     void Start()
     {
-        InitializeBoard();
+        player = new Player();
+        InitializeWorldMap();
         InitializeWalls();
         InitializeSnake();
         InitializeFruits();
@@ -53,20 +46,20 @@ public class GameManager : MonoBehaviour
         #endif
     }
 
-    private void InitializeBoard()
+    private void InitializeWorldMap()
     {
-        matrixWalls = new int[boardRows, boardCols];
-        matrixSnake = new int[boardRows, boardCols];
-        matrixFrutitas = new int[boardRows, boardCols];
+        worldMap = new WorldMap();
+        worldMap.InitializeBoard();
     }
 
     private void InitializeSnake()
     {
-        snakePositions = new List<Vector3Int>();
+        snake = new Snake();
+        
         snakeGraphicParts = new List<GameObject>();
         CreateSnakeFirstPosition();
 
-        snakeState = new SnakeStopped();
+        
     }
 
     private void InitializeWalls()
@@ -78,34 +71,7 @@ public class GameManager : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        //esto quedaría super lindo
-        //hacer un patrón state y tal vez un command
-        if (Input.GetKeyDown(KeyCode.D))
-        {
-            snakeState.Execute(this);
-            if(currentDirection !=LEFT) currentDirection  = RIGHT;
-        }else if (Input.GetKeyDown(KeyCode.W))
-        {
-            snakeState.Execute(this);
-            if (currentDirection  != DOWN) currentDirection  = UP;
-        }else if (Input.GetKeyDown(KeyCode.A))
-        {
-            snakeState.Execute(this);
-            if (currentDirection  != RIGHT) currentDirection  = LEFT;
-        }else if (Input.GetKeyDown(KeyCode.S))
-        {
-            snakeState.Execute(this);
-            if (currentDirection  != UP) currentDirection  = DOWN;
-        }
-        //mientras se presiona el shift izquierdo, se incrementa la velocidad
-        if (Input.GetKeyDown(KeyCode.LeftShift))
-        {
-            speed = 0.05f;
-        }
-        if (Input.GetKeyUp(KeyCode.LeftShift))
-        {
-            speed = 0.2f;
-        }
+        player.Update(this);
 
         MoveCamera();
     
@@ -113,7 +79,7 @@ public class GameManager : MonoBehaviour
 
     private void MoveCamera()
     {
-        Vector3Int snakeHead = snakePositions[snakePositions.Count - 1];
+        Vector3Int snakeHead = snake.GetHead();
         snakeHead.z -= 15;
         snakeHead.y = 20;
         camera.transform.position = Vector3.Lerp(camera.transform.position, snakeHead, 1 * Time.deltaTime);
@@ -121,57 +87,51 @@ public class GameManager : MonoBehaviour
 
     public void StartExecution()
     {
-        Invoke("Execute", speed);
-        snakeState = new SnakeMooving();
+        Invoke("Execute", player.GetSpeed());
+        player.StartMoving();
     }
 
     private void FreeSnakeTailPosition()
     {
-        ultimaPosicion = snakePositions[0];
-        matrixSnake[ultimaPosicion.x, ultimaPosicion.z] = 0;
+        worldMap.FreeSnakePartAt(snake.GetTail().x,snake.GetTail().z);
     }
 
-    private void UpdateSnakePositionsWhileMoving()
-    {
-        for (int i = 0; i < snakePositions.Count - 1; i++)
-        {
-            snakePositions[i] = snakePositions[i + 1];
-        }
-    }
+
 
     private void UpdateSnakeHeadPosition(Vector3Int pos)
     {
-        snakePositions[snakePositions.Count - 1] = pos;
-        matrixSnake[snakePositions[snakePositions.Count - 1].x, snakePositions[snakePositions.Count - 1].z] = 1;
+        snake.UpdateHeadPosition(pos);
+        worldMap.PlaceSnakePartAt(snake.GetHead().x, snake.GetHead().z);
     }
 
     private void UpdateSnakeGraphicsWhileMoving()
     {
         for (int i = 0; i < snakeGraphicParts.Count; i++)
         {
-            snakeGraphicParts[i].transform.position = snakePositions[i];
+            snakeGraphicParts[i].transform.position = snake.GetSnakePartPosition(i);
         }
     }
 
     private void Execute()
     {
+        ultimaPosicion = snake.GetTail();
         FreeSnakeTailPosition();
-        UpdateSnakePositionsWhileMoving();
-        Vector3Int pos = snakePositions[snakePositions.Count - 1];
+        snake.UpdateSnakePositionsWhileMoving();
+        Vector3Int pos = snake.GetHead();
 
-        if (currentDirection  == RIGHT)
+        if (player.IsRight())
         {
             pos.x += 1;
         }
-        else if (currentDirection  == UP)
+        else if (player.IsUp())
         {
             pos.z += 1;
         }
-        else if (currentDirection  == LEFT)
+        else if (player.IsLeft())
         {
             pos.x -= 1;
         }
-        else if (currentDirection  == DOWN)
+        else if (player.IsDown())
         {
             pos.z-= 1;
         }
@@ -190,48 +150,27 @@ public class GameManager : MonoBehaviour
         }
 
         //vuelve a llamar a ejecutar 
-        if(!endOfGame)Invoke("Execute", speed);
+        if(!endOfGame)Invoke("Execute", player.GetSpeed());
     }
 
     private void AgregarElementoGraficoAlFinalDeLaColaDeLaSerpiente()
     {
-        snakePositions.Insert(0, ultimaPosicion);
-        GameObject nuevoCubito = Instantiate(snake, ultimaPosicion, transform.rotation);
+        //ver que onda la ultima posicion
+        snake.UpdateTailPosition(ultimaPosicion);
+        GameObject nuevoCubito = Instantiate(snakeGraphic, ultimaPosicion, transform.rotation);
         snakeGraphicParts.Insert(0, nuevoCubito);
 
-        matrixSnake[ultimaPosicion.x, ultimaPosicion.z] = 1;
+        worldMap.PlaceSnakePartAt(ultimaPosicion.x, ultimaPosicion.z);
     }
 
 
-    private void CheckCollisions()
-    {
-        if (CheckFruitCollision())
-        {
-            DestroyFruit();
-            CreateNewFruit();
-        }
-        if (CheckWallsCollision()) //agregar colision con la serpiente
-        {
-            endOfGame = true;
-            panelPerdiste.SetActive(true);
-        }
-        
-    }
-
-    private bool CheckWallsCollision()
-    {
-        return (matrixWalls[snakePositions[snakePositions.Count - 1].x, snakePositions[snakePositions.Count - 1].z] == 1);
-    }
-
-    private bool CheckFruitCollision()
-    {
-        return (matrixFrutitas[snakePositions[snakePositions.Count - 1].x, snakePositions[snakePositions.Count - 1].z] == 1);
-
-    }
+   
 
     private void DestroyFruit()
     {
-        matrixFrutitas[(int)laFrutita.transform.position.x, (int)laFrutita.transform.position.z] = 0;
+        int r = (int)laFrutita.transform.position.x;
+        int c = (int)laFrutita.transform.position.z;
+        worldMap.FreeFruitAt(r, c);
         Destroy(laFrutita);
     }
 
@@ -241,46 +180,56 @@ public class GameManager : MonoBehaviour
         gotFrutita = true;
     }
 
-    private bool CheckSnakeCollision()
+    public void CheckCollisions()
     {
-        return (matrixSnake[snakePositions[snakePositions.Count - 1].x, snakePositions[snakePositions.Count - 1].z] == 1);
+        if (worldMap.CheckFruitCollision(snake.GetHead()))
+        {
+            DestroyFruit();
+            CreateNewFruit();
+        }
+        if (worldMap.CheckWallsCollision(snake.GetHead())) //agregar colision con la serpiente
+        {
+            endOfGame = true;
+            panelPerdiste.SetActive(true);
+        }
     }
+
+    
 
     private void CreateRandomWalls()
     {
-        int numberOfRandomWalls = Random.Range(minNumberOfWalls,maxNumberOfWalls);
+        int numberOfRandomWalls = worldMap.RandomWallValue();
         for(int i = 0; i < numberOfRandomWalls; i++)
         {
-            Vector3Int nuevaPos = GetFreePosition();
+            Vector3Int nuevaPos = worldMap.GetFreePosition();
             CreateWall(nuevaPos);
         }
     }
 
     private void CreateBorderWalls()
     {
-        for(int i = 0; i < boardCols; i++)
+        for(int i = 0; i < worldMap.GetColumns(); i++)
         {
             CreateWall(new Vector3Int(0, 0, i));
-            CreateWall(new Vector3Int(boardRows - 1, 0, i));
+            CreateWall(new Vector3Int(worldMap.GetRows() - 1, 0, i));
         }
 
-        for (int j = 0; j < boardRows; j++)
+        for (int j = 0; j < worldMap.GetRows(); j++)
         {
             CreateWall(new Vector3Int(j, 0, 0));
-            CreateWall(new Vector3Int(j, 0, boardCols - 1));
+            CreateWall(new Vector3Int(j, 0, worldMap.GetColumns() - 1));
         }
     }
 
     private void CreateWall(Vector3Int nuevaPos)
     {
-        Instantiate(Walls, nuevaPos, transform.rotation);
-        Debug.Log(nuevaPos);
-        matrixWalls[nuevaPos.x, nuevaPos.z] = 1;
+        Instantiate(wallGraphic, nuevaPos, transform.rotation);
+        worldMap.PlaceWallAt(nuevaPos.x, nuevaPos.z);
     }
 
     private void CreateSnakeFirstPosition()
     {
-        Vector3Int nuevaPos = GetFreePosition();
+        Vector3Int nuevaPos = worldMap.GetFreePosition();
         AddNewSnakeGraphicPart(nuevaPos);
         UpdateSnakeMatrix(nuevaPos);
     }
@@ -288,51 +237,28 @@ public class GameManager : MonoBehaviour
 
     private void UpdateSnakeMatrix(Vector3Int nuevaPos)
     {
-        snakePositions.Add(nuevaPos);
-        matrixSnake[nuevaPos.x, nuevaPos.z] = 1;
+        snake.AddNewPart(nuevaPos);
+        worldMap.PlaceSnakePartAt(nuevaPos.x, nuevaPos.z);
     }
 
     private void AddNewSnakeGraphicPart(Vector3Int nuevaPos)
     {
-        GameObject nuevoSnakePart = Instantiate(snake, nuevaPos, transform.rotation) as GameObject;
+        GameObject nuevoSnakePart = Instantiate(snakeGraphic, nuevaPos, transform.rotation) as GameObject;
         snakeGraphicParts.Add(nuevoSnakePart);
     }
 
-    private Vector3Int GetFreePosition()
-    {
-        bool isAvailable = false;
-        Vector3Int newFreePosition = new Vector3Int(0, 0, 0);
-        while (!isAvailable)
-        {
-            newFreePosition = new Vector3Int(Random.Range(1, boardRows), 0, Random.Range(1, boardCols));
-            isAvailable = IsFreeSurroundings(newFreePosition);
-        }
-        return newFreePosition;
-    }
-
-    private bool IsFreeSurroundings(Vector3Int pos)
-    {
-        bool isAvailable = true;
-        for(int i = pos.x - 1; i< pos.x+1 && isAvailable ; i++)
-        {
-            for(int j = pos.z - 1; j < pos.z + 1 && isAvailable; j++)
-            {
-                isAvailable = matrixWalls[i,j] != 1;
-            }
-        }
-        return isAvailable;
-    }
+    
 
     private void InitializeFruits()
     {
-        Vector3Int nuevaPos = GetFreePosition();
+        Vector3Int nuevaPos = worldMap.GetFreePosition();
         CreateFruit(nuevaPos);        
     }
 
     private void CreateFruit(Vector3Int nuevaPos)
     {
-        laFrutita = Instantiate(frutita, nuevaPos, transform.rotation) as GameObject;
-        matrixFrutitas[nuevaPos.x, nuevaPos.z] = 1;
+        laFrutita = Instantiate(fruitGraphic, nuevaPos, transform.rotation) as GameObject;
+        worldMap.PlaceFrutitaAt(nuevaPos.x, nuevaPos.z);
     }
 
     public void Reiniciar()
@@ -342,7 +268,7 @@ public class GameManager : MonoBehaviour
 
 
     //android part
-
+    /*
     public void pressedUp()
     {
         if (currentDirection  == 0) StartExecution();
@@ -366,14 +292,14 @@ public class GameManager : MonoBehaviour
         if (currentDirection  == 0) StartExecution();
         if (currentDirection  != 3) currentDirection  = 1;
     }
-
+    */
     public void PressedSpaceUp()
     {
-        speed = 0.05f;
+        player.SetSpeed(0.05f);
     }
 
     public void releasedSpaceUp()
     {
-        speed = 0.2f;
+        player.SetSpeed(0.2f);
     }
 }
